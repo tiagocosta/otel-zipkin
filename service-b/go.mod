@@ -6,7 +6,6 @@ require (
 	github.com/go-chi/chi/v5 v5.0.12
 	github.com/spf13/viper v1.18.2
 	github.com/stretchr/testify v1.9.0
-	github.com/tiagocosta/cloud-run v0.0.0-20240509134709-0fa1a000e232
 )
 
 require (

@@ -5,7 +5,8 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"time"
+
+	"go.opentelemetry.io/otel/trace"
 )
 
 type ZipCodeDTO struct {
@@ -24,13 +25,19 @@ type WeatherOutputDTO struct {
 }
 
 type WebZipCodeHandler struct {
+	Tracer trace.Tracer
 }
 
-func NewWebZipCodeHandler() *WebZipCodeHandler {
-	return &WebZipCodeHandler{}
+func NewWebZipCodeHandler(tracer trace.Tracer) *WebZipCodeHandler {
+	return &WebZipCodeHandler{
+		Tracer: tracer,
+	}
 }
 
 func (h *WebZipCodeHandler) ProcessZipCode(w http.ResponseWriter, r *http.Request) {
+	// ctx, span := h.Tracer.Start(r.Context(), "process-zip-code", trace.WithSpanKind(trace.SpanKindServer))
+	_, span := h.Tracer.Start(r.Context(), "processing zip code")
+	// defer span.End()
 	var dto ZipCodeDTO
 	err := json.NewDecoder(r.Body).Decode(&dto)
 
@@ -43,6 +50,8 @@ func (h *WebZipCodeHandler) ProcessZipCode(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "invalid zipcode", http.StatusUnprocessableEntity)
 		return
 	}
+	span.End()
+
 	weatherDTO := WeatherInputDTO(dto)
 	res, err := h.callServiceB(weatherDTO)
 	if err != nil {
@@ -83,9 +92,7 @@ func (h *WebZipCodeHandler) callServiceB(weatherDTO WeatherInputDTO) (*http.Resp
 	defer req.Body.Close()
 	req.Header.Set("Content-Type", "application/json")
 
-	client := http.Client{
-		Timeout: 30 * time.Second,
-	}
+	client := http.Client{}
 	res, err := client.Do(req)
 	if err != nil {
 		return nil, err
