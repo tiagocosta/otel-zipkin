@@ -1,0 +1,26 @@
+version: "3.7"
+
+services:
+  zipkin-collector:
+    image: openzipkin/zipkin-slim:latest
+    container_name: zipkin
+    ports:
+      - "9411:9411"
+  app-a:
+    build: 
+      context: ./service-a
+      dockerfile: Dockerfile
+    container_name: service-a
+    ports:
+      - "8081:8081"
+    volumes:
+      - .:/go/src/
+  app-b:
+    build: 
+      context: ./service-b
+      dockerfile: Dockerfile
+    container_name: service-b
+    ports:
+      - "8082:8082"
+    volumes:
+      - .:/go/src/
