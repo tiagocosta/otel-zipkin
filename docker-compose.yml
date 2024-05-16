@@ -3,12 +3,14 @@ version: "3.7"
 services:
   zipkin-all-in-one:
     image: openzipkin/zipkin:latest
+    container_name: zipkin-all-in-one
     restart: always
     ports:
       - "9411:9411"
 
   otel-collector:
     image: otel/opentelemetry-collector:latest
+    container_name: otel-collector
     restart: always
     command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:
@@ -27,17 +29,11 @@ services:
     depends_on:
       - zipkin-all-in-one
       - otel-collector
+    ports:
+      - "8081:8081"
     volumes:
       - ./service-a:/go/src/app
     command: ["tail", "-f", "/dev/null"]
-    # build: 
-    #   context: ./service-a
-    #   dockerfile: Dockerfile
-    # container_name: service-a
-    # ports:
-    #   - "8081:8081"
-    # volumes:
-    #   - ./service-a:/go/src/
 
   app-b:
     image: golang:latest
@@ -45,15 +41,9 @@ services:
     depends_on:
       - zipkin-all-in-one
       - otel-collector
+    ports:
+      - "8082:8082"
     volumes:
       - ./service-b:/go/src/app
     command: ["tail", "-f", "/dev/null"]
-    # build: 
-    #   context: ./service-b
-    #   dockerfile: Dockerfile
-    # container_name: service-b
-    # ports:
-    #   - "8082:8082"
-    # volumes:
-    #   - ./service-b:/go/src/
   

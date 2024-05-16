@@ -84,7 +84,7 @@ func (h *WebZipCodeHandler) callServiceB(weatherDTO WeatherInputDTO) (*http.Resp
 		return nil, err
 	}
 	bodyReader := bytes.NewReader(jsonBody)
-	requestURL := "http://localhost:8082/weather"
+	requestURL := "http://service-b:8082/weather"
 	req, err := http.NewRequest(http.MethodPost, requestURL, bodyReader)
 	if err != nil {
 		return nil, err
