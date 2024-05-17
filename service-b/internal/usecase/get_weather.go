@@ -1,12 +1,14 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/tiagocosta/otel-zipkin-service-b/configs"
 	"github.com/tiagocosta/otel-zipkin-service-b/internal/entity"
 	"github.com/tiagocosta/otel-zipkin-service-b/internal/pkg/wheatherapi"
 	"github.com/tiagocosta/otel-zipkin-service-b/internal/pkg/zipcodeapi"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var cfg configs.Conf
@@ -23,28 +25,35 @@ type GetWeatherOutputDTO struct {
 }
 
 type GetWeatherUseCase struct {
+	Tracer trace.Tracer
 }
 
-func NewGetWeatherUseCase() *GetWeatherUseCase {
+func NewGetWeatherUseCase(tracer trace.Tracer) *GetWeatherUseCase {
 	cfg = configs.LoadConfig[configs.Conf](".")
-	return &GetWeatherUseCase{}
+	return &GetWeatherUseCase{
+		Tracer: tracer,
+	}
 }
 
-func (uc *GetWeatherUseCase) Execute(input GetWeatherInputDTO) (GetWeatherOutputDTO, error) {
+func (uc *GetWeatherUseCase) Execute(ctx context.Context, input GetWeatherInputDTO) (GetWeatherOutputDTO, error) {
 	weather, err := entity.NewWeather(input.ZipCode)
 	if err != nil {
 		return GetWeatherOutputDTO{}, err
 	}
+	ctx, spanZip := uc.Tracer.Start(ctx, "fiding zip code")
 	city, err := zipcodeapi.FindCity(weather.Zip)
 	if err != nil {
 		return GetWeatherOutputDTO{}, err
 	}
+	spanZip.End()
 
+	_, spanWeather := uc.Tracer.Start(ctx, "finding weather")
 	weather.City = city
 	celsius, err := wheatherapi.GetWeather(weather.City, cfg.WeatherAPIKey)
 	if err != nil {
 		return GetWeatherOutputDTO{}, err
 	}
+	spanWeather.End()
 	weather.FromCelsius(celsius)
 
 	out := GetWeatherOutputDTO{

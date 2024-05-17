@@ -13,12 +13,13 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/zipkin"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 )
 
-var logger = log.New(os.Stderr, "zipkin-example", log.Ldate|log.Ltime|log.Llongfile)
+var logger = log.New(os.Stderr, "zipkin-service-a ", log.Ldate|log.Ltime|log.Llongfile)
 
 func initTracer(url string) (func(context.Context) error, error) {
 	exporter, err := zipkin.New(
@@ -38,6 +39,7 @@ func initTracer(url string) (func(context.Context) error, error) {
 			semconv.ServiceName("service-a"),
 		)),
 	)
+	otel.SetTextMapPropagator(propagation.TraceContext{})
 	otel.SetTracerProvider(tp)
 
 	return tp.Shutdown, nil
@@ -64,7 +66,7 @@ func main() {
 		}
 	}()
 
-	tracer := otel.Tracer("microservice-tracer")
+	tracer := otel.Tracer("service-a-tracer")
 	webserver := webserver.NewWebServer(cfg.WebServerPort)
 	webZipCodeHandler := web.NewWebZipCodeHandler(tracer)
 	webserver.AddHandler("/weather", webZipCodeHandler.ProcessZipCode)

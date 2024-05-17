@@ -2,10 +2,13 @@ package web
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -35,9 +38,13 @@ func NewWebZipCodeHandler(tracer trace.Tracer) *WebZipCodeHandler {
 }
 
 func (h *WebZipCodeHandler) ProcessZipCode(w http.ResponseWriter, r *http.Request) {
-	// ctx, span := h.Tracer.Start(r.Context(), "process-zip-code", trace.WithSpanKind(trace.SpanKindServer))
-	_, span := h.Tracer.Start(r.Context(), "processing zip code")
-	// defer span.End()
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+	carrier := propagation.HeaderCarrier(r.Header)
+	ctx := otel.GetTextMapPropagator().Extract(r.Context(), carrier)
+	ctx, span := h.Tracer.Start(ctx, "starting service-a handler")
+	defer span.End()
+
+	ctx, spanZipCode := h.Tracer.Start(ctx, "validating zipcode")
 	var dto ZipCodeDTO
 	err := json.NewDecoder(r.Body).Decode(&dto)
 
@@ -50,14 +57,16 @@ func (h *WebZipCodeHandler) ProcessZipCode(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "invalid zipcode", http.StatusUnprocessableEntity)
 		return
 	}
-	span.End()
+	spanZipCode.End()
 
+	ctx, spanCallServiceB := h.Tracer.Start(ctx, "calling service-b")
 	weatherDTO := WeatherInputDTO(dto)
-	res, err := h.callServiceB(weatherDTO)
+	res, err := h.callServiceB(ctx, weatherDTO)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	defer res.Body.Close()
+	spanCallServiceB.End()
 
 	if res.StatusCode != http.StatusOK {
 		errMsg, _ := io.ReadAll(res.Body)
@@ -78,19 +87,21 @@ func (h *WebZipCodeHandler) ProcessZipCode(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-func (h *WebZipCodeHandler) callServiceB(weatherDTO WeatherInputDTO) (*http.Response, error) {
+func (h *WebZipCodeHandler) callServiceB(ctx context.Context, weatherDTO WeatherInputDTO) (*http.Response, error) {
 	jsonBody, err := json.Marshal(weatherDTO)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader := bytes.NewReader(jsonBody)
 	requestURL := "http://service-b:8082/weather"
-	req, err := http.NewRequest(http.MethodPost, requestURL, bodyReader)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, requestURL, bodyReader)
 	if err != nil {
 		return nil, err
 	}
 	defer req.Body.Close()
 	req.Header.Set("Content-Type", "application/json")
+
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
 
 	client := http.Client{}
 	res, err := client.Do(req)
