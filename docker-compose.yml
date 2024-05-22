@@ -9,24 +9,24 @@ services:
       - "9411:9411"
 
   app-a:
-    image: golang:latest
+    build: ./service-a
     container_name: service-a
     depends_on:
       - zipkin-all-in-one
     ports:
       - "8081:8081"
     volumes:
-      - ./service-a:/go/src/app
-    command: ["tail", "-f", "/dev/null"]
+      - ./service-a:/app
+    # command: ["tail", "-f", "/dev/null"]
 
   app-b:
-    image: golang:latest
+    build: ./service-b
     container_name: service-b
     depends_on:
       - zipkin-all-in-one
     ports:
       - "8082:8082"
     volumes:
-      - ./service-b:/go/src/app
-    command: ["tail", "-f", "/dev/null"]
+      - ./service-b:/app
+    # command: ["tail", "-f", "/dev/null"]
   
